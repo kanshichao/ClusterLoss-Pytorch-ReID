@@ -1,5 +1,6 @@
 # ClusterLoss Pytorch
 * This is a Pytorch reproduction of Cluster Loss, which is proposed in paper *《Cluster Loss for Person Re-Identification》*
+* There is also a version of RangeLoss for local feature of AlignedReID++, which is proposed in paper *《Alignedreid＋+: Dynamically Matching Local Information for Person Re-Identification》*
 
 ## Code Environment Description
 Our code execution environment is:
