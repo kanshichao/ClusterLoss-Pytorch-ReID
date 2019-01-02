@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 
 class ClusterLoss(nn.Module):
@@ -29,7 +30,7 @@ class ClusterLoss(nn.Module):
         dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
         return dist
 
-    def _cluster_loss(self, features, targets, ordered=True, ids_per_batch=32, imgs_per_id=4):
+    def _cluster_loss(self, features, targets,ordered=True, ids_per_batch=32, imgs_per_id=4):
         """
         Args:
             features: prediction matrix (before softmax) with shape (batch_size, feature_dim)
@@ -71,19 +72,18 @@ class ClusterLoss(nn.Module):
             label = unique_labels[i]
             same_class_features = features[targets == label]
             center_features[i] = same_class_features.mean(dim=0)
-            intra_class_distance = self._euclidean_dist(center_features[index == i], same_class_features)
+            intra_class_distance = self._euclidean_dist(center_features[index==i], same_class_features)
             # print('intra_class_distance', intra_class_distance)
             intra_max_distance[i] = intra_class_distance.max()
         # print('intra_max_distance:', intra_max_distance)
 
         for i in range(unique_labels.size(0)):
-            inter_class_distance = self._euclidean_dist(center_features[index == i], center_features[index != i])
+            inter_class_distance = self._euclidean_dist(center_features[index==i], center_features[index != i])
             # print('inter_class_distance', inter_class_distance)
             inter_min_distance[i] = inter_class_distance.min()
         #  print('inter_min_distance:', inter_min_distance)
-
-        cluster_loss = torch.sum(torch.relu(intra_max_distance - inter_min_distance + self.margin))
-        return cluster_loss
+        cluster_loss = torch.mean(torch.relu(intra_max_distance - inter_min_distance + self.margin))
+        return cluster_loss, intra_max_distance, inter_min_distance
 
     def forward(self, features, targets):
         """
@@ -97,8 +97,8 @@ class ClusterLoss(nn.Module):
              cluster_loss
         """
         assert features.size(0) == targets.size(0), "features.size(0) is not equal to targets.size(0)"
-        cluster_loss = self._cluster_loss(features, targets, self.ordered, self.ids_per_batch, self.imgs_per_id)
-        return cluster_loss
+        cluster_loss, cluster_dist_ap, cluster_dist_an = self._cluster_loss(features, targets, self.ordered, self.ids_per_batch, self.imgs_per_id)
+        return cluster_loss, cluster_dist_ap, cluster_dist_an
 
 
 class ClusterLoss_local(nn.Module):
@@ -229,8 +229,8 @@ class ClusterLoss_local(nn.Module):
             inter_min_distance[i] = inter_class_distance.min()
         # print('inter_min_distance:', inter_min_distance)
 
-        cluster_loss = torch.sum(torch.relu(intra_max_distance - inter_min_distance + self.margin))
-        return cluster_loss
+        cluster_loss = torch.mean(torch.relu(intra_max_distance - inter_min_distance + self.margin))
+        return cluster_loss, intra_max_distance, inter_min_distance
 
     def forward(self, features, targets):
         """
@@ -244,8 +244,8 @@ class ClusterLoss_local(nn.Module):
              cluster_loss
         """
         assert features.size(0) == targets.size(0), "features.size(0) is not equal to targets.size(0)"
-        cluster_loss = self._cluster_loss(features, targets, self.ordered, self.ids_per_batch, self.imgs_per_id)
-        return cluster_loss
+        cluster_loss, cluster_dist_ap, cluster_dist_an = self._cluster_loss(features, targets, self.ordered, self.ids_per_batch, self.imgs_per_id)
+        return cluster_loss, cluster_dist_ap, cluster_dist_an
 
 
 if __name__ == '__main__':
